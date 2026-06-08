@@ -1,0 +1,1828 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Activity Log</title>
+<script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{--bg:#0f1117;--surf:#1a1d27;--surf2:#22263a;--bdr:#2e3350;--txt:#e8eaf0;--muted:#8890aa;
+  --red:#ef4444;--blu:#3b82f6;--ind:#6366f1;--grn:#10b981;--ylw:#fbbf24;--cya:#38bdf8;--orng:#f59e0b}
+body{background:var(--bg);color:var(--txt);font-family:"Segoe UI",system-ui,sans-serif;font-size:14px;min-height:100vh}
+
+/* header */
+.hdr{background:linear-gradient(135deg,#1e2235,#0f1117);border-bottom:1px solid var(--bdr);padding:18px 24px;display:flex;align-items:center;gap:18px;flex-wrap:wrap}
+.hdr h1{font-size:18px;font-weight:700;color:#fff;flex-shrink:0}
+.hdr-spacer{flex:1}
+.hdr-field{display:flex;flex-direction:column;gap:3px}
+.hdr-field label{font-size:9px;color:var(--muted);text-transform:uppercase;letter-spacing:.5px}
+.hdr-field input,.hdr-field select{background:var(--surf2);border:1px solid var(--bdr);color:var(--txt);border-radius:6px;padding:7px 12px;font-size:13px;outline:none;font-family:inherit;min-width:140px}
+.hdr-field input:focus,.hdr-field select:focus{border-color:var(--ind)}
+
+/* tabs */
+.tab-bar{display:flex;gap:2px;padding:0 24px;background:#13161f;border-bottom:1px solid var(--bdr);overflow-x:auto}
+.tab-btn{background:none;border:none;color:var(--muted);padding:12px 22px;font-size:13px;font-weight:600;cursor:pointer;border-bottom:2px solid transparent;display:inline-flex;align-items:center;gap:7px;transition:all .12s;white-space:nowrap;font-family:inherit}
+.tab-btn:hover{color:var(--txt)}
+.tab-btn.active{color:#fff;border-bottom-color:var(--ind)}
+.tab-btn .count{background:var(--surf2);border:1px solid var(--bdr);border-radius:10px;padding:1px 7px;font-size:10px;font-weight:600;color:var(--muted);font-variant-numeric:tabular-nums}
+.tab-btn.active .count{background:rgba(99,102,241,.18);border-color:var(--ind);color:#a5b4fc}
+
+.main{padding:20px 24px;max-width:1280px;margin:0 auto}
+.section{display:none}
+.section.active{display:block}
+
+/* cards */
+.card{background:var(--surf);border:1px solid var(--bdr);border-radius:10px;padding:16px;margin-bottom:16px}
+.card-t{font-size:13px;font-weight:700;margin-bottom:4px}
+.card-s{font-size:11px;color:var(--muted);margin-bottom:12px}
+
+/* form */
+.form-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:12px;margin-bottom:12px}
+.form-field{display:flex;flex-direction:column;gap:5px}
+.form-field.full{grid-column:1/-1}
+.form-field label{font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;font-weight:600}
+.form-field label .req{color:#fca5a5;font-weight:700;margin-left:2px}
+.form-input,.form-textarea,.form-select{background:var(--surf2);border:1px solid var(--bdr);color:var(--txt);border-radius:6px;padding:10px 12px;font-size:13px;outline:none;font-family:inherit;width:100%}
+.form-input:focus,.form-textarea:focus,.form-select:focus{border-color:var(--ind)}
+.form-input::placeholder,.form-textarea::placeholder{color:var(--muted)}
+.form-input[type="date"],.form-input[type="time"]{color-scheme:dark}
+.form-textarea{min-height:80px;resize:vertical;line-height:1.5}
+.form-actions{display:flex;justify-content:flex-end;gap:10px;padding-top:8px;border-top:1px solid var(--bdr)}
+.btn{background:var(--ind);color:#fff;border:none;border-radius:6px;padding:10px 22px;font-size:13px;font-weight:700;cursor:pointer;font-family:inherit;transition:background .12s}
+.btn:hover{background:#4f46e5}
+.btn-green{background:var(--grn)}
+.btn-green:hover{background:#059669}
+.btn-secondary{background:transparent;border:1px solid var(--bdr);color:var(--txt)}
+.btn-secondary:hover{border-color:var(--ind);color:#a5b4fc}
+.btn-danger{background:transparent;border:1px solid var(--red);color:#fca5a5}
+.btn-danger:hover{background:rgba(239,68,68,.1);color:var(--red)}
+.btn-small{padding:5px 12px;font-size:11px;font-weight:600}
+
+/* entries list */
+.entries-row{display:flex;justify-content:space-between;align-items:center;gap:10px;margin-bottom:10px;flex-wrap:wrap}
+.date-pick{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.entry-card{background:var(--surf2);border:1px solid var(--bdr);border-radius:8px;padding:12px 14px;margin-bottom:8px}
+.entry-card-hdr{display:flex;align-items:center;gap:10px;margin-bottom:6px;flex-wrap:wrap;font-size:12px}
+.entry-line{font-family:monospace;font-weight:700;color:#cbd5e1;font-size:13px}
+.entry-time{color:var(--muted);font-variant-numeric:tabular-nums}
+.entry-time.warn{color:var(--ylw)}
+.entry-act{font-size:13px;font-weight:600;color:var(--txt);margin:4px 0 4px;line-height:1.4}
+.entry-meta{font-size:11px;color:var(--muted);display:flex;gap:14px;flex-wrap:wrap;margin-bottom:6px}
+.entry-meta strong{color:#cbd5e1}
+.entry-actions{display:flex;gap:6px;margin-top:8px}
+.cls-badge{display:inline-block;padding:2px 9px;border-radius:20px;font-size:10px;font-weight:700;letter-spacing:.3px}
+.cls-Downtime{background:rgba(239,68,68,.18);color:#fca5a5}
+.cls-Investigating{background:rgba(56,189,248,.18);color:#7dd3fc}
+.cls-Project{background:rgba(59,130,246,.18);color:#93c5fd}
+.cls-Training{background:rgba(16,185,129,.18);color:#6ee7b7}
+.cls-No-Activities{background:rgba(251,191,36,.18);color:#fcd34d}
+
+/* action plan */
+.priority-Low{background:rgba(59,130,246,.15);color:#93c5fd}
+.priority-Medium{background:rgba(245,158,11,.15);color:#fcd34d}
+.priority-High{background:rgba(239,68,68,.18);color:#fca5a5}
+.status-Open{background:rgba(99,102,241,.15);color:#a5b4fc}
+.status-In-Progress{background:rgba(245,158,11,.18);color:#fcd34d}
+.status-Closed{background:rgba(100,116,139,.18);color:#94a3b8}
+.priority-badge,.status-badge{display:inline-block;padding:2px 9px;border-radius:20px;font-size:10px;font-weight:700;letter-spacing:.3px}
+
+.due-ok{color:#6ee7b7;font-weight:700;font-variant-numeric:tabular-nums}
+.due-soon{color:#fcd34d;font-weight:700;font-variant-numeric:tabular-nums}
+.due-past{color:#fca5a5;font-weight:800;font-variant-numeric:tabular-nums}
+.due-closed{color:#64748b;font-variant-numeric:tabular-nums}
+
+/* tables */
+.tbl-wrap{overflow-x:auto;margin-top:8px}
+table{width:100%;border-collapse:collapse;font-size:12px}
+thead tr{background:var(--surf2)}
+thead th{text-align:left;padding:8px 10px;font-size:10px;text-transform:uppercase;letter-spacing:.4px;color:var(--muted);white-space:nowrap}
+tbody tr{border-bottom:1px solid var(--bdr)}
+tbody tr:hover{background:rgba(99,102,241,.04)}
+tbody td{padding:8px 10px;vertical-align:top}
+.act-cell{max-width:280px;word-break:break-word}
+
+/* modal */
+.modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,.8);z-index:1000;display:none;align-items:flex-start;justify-content:center;padding:40px 20px;overflow-y:auto}
+.modal-overlay.show{display:flex}
+.modal-box{background:var(--surf);border:1px solid var(--bdr);border-radius:12px;width:100%;max-width:920px;display:flex;flex-direction:column;max-height:90vh}
+.modal-hdr{padding:14px 20px;border-bottom:1px solid var(--bdr);display:flex;align-items:center;justify-content:space-between;flex-shrink:0}
+.modal-hdr h3{font-size:15px;font-weight:700}
+.modal-body{padding:16px 20px;overflow-y:auto;flex:1}
+.modal-foot{display:flex;justify-content:space-between;gap:10px;padding:14px 20px;border-top:1px solid var(--bdr);flex-shrink:0}
+
+/* toast */
+.toast{position:fixed;bottom:20px;right:20px;background:var(--surf);border:1px solid var(--bdr);border-left:3px solid var(--ind);border-radius:8px;padding:11px 18px;font-size:13px;color:var(--txt);box-shadow:0 4px 18px rgba(0,0,0,.45);z-index:2000;max-width:380px;opacity:0;transform:translateY(8px);transition:opacity .15s,transform .15s;pointer-events:none}
+.toast.show{opacity:1;transform:translateY(0)}
+.toast.ok{border-left-color:var(--grn)}
+.toast.err{border-left-color:var(--red)}
+
+/* empty */
+.empty{text-align:center;padding:40px 20px;color:var(--muted);font-style:italic}
+
+.sync-status{display:inline-flex;align-items:center;gap:6px;padding:3px 10px;border-radius:14px;font-size:11px;font-weight:600;font-variant-numeric:tabular-nums}
+.sync-status.ok{background:rgba(16,185,129,.15);color:#6ee7b7;border:1px solid rgba(16,185,129,.4)}
+.sync-status.warn{background:rgba(245,158,11,.15);color:#fcd34d;border:1px solid rgba(245,158,11,.4)}
+.sync-status.err{background:rgba(239,68,68,.15);color:#fca5a5;border:1px solid rgba(239,68,68,.4)}
+.sync-status.muted{background:var(--surf2);color:var(--muted);border:1px solid var(--bdr)}
+.folder-card{background:var(--surf2);border:1px solid var(--bdr);border-radius:8px;padding:12px 16px;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px}
+.folder-card .fname{font-family:monospace;color:#cbd5e1;font-size:13px;font-weight:600}
+.folder-card .none{color:var(--muted);font-style:italic;font-size:12px}
+.author-tag{display:inline-block;font-size:9px;padding:1px 7px;border-radius:10px;background:rgba(99,102,241,.15);color:#a5b4fc;font-weight:700;letter-spacing:.3px;margin-left:5px}
+
+/* Image attach + camera */
+.img-attach-row{background:var(--surf2);border:1px dashed var(--bdr);border-radius:8px;padding:12px 14px;margin-top:8px}
+.img-attach-label{font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;font-weight:600;margin-bottom:8px}
+.img-attach-buttons{display:flex;gap:8px;flex-wrap:wrap}
+.img-preview-row{display:flex;align-items:center;gap:14px;margin-top:12px;padding-top:12px;border-top:1px solid var(--bdr)}
+.img-preview-row img{width:84px;height:84px;object-fit:cover;border-radius:6px;border:1px solid var(--bdr)}
+.img-preview-info{flex:1;min-width:0}
+.img-preview-info .pname{font-size:12px;color:#cbd5e1;font-weight:600;word-break:break-word}
+.img-preview-info .psize{font-size:11px;color:var(--muted);margin-top:3px}
+
+.cam-stage{display:flex;flex-direction:column;align-items:center;gap:10px}
+.cam-stage video{width:100%;max-height:55vh;border-radius:8px;background:#000;display:block}
+.cam-stage canvas{display:none}
+.cam-preview{display:flex;flex-direction:column;align-items:center;gap:10px}
+.cam-preview img{width:100%;max-height:55vh;object-fit:contain;border-radius:8px;background:#000;display:block}
+.cam-status{text-align:center;font-size:12px;color:var(--muted);min-height:18px}
+
+.img-thumb{width:36px;height:36px;object-fit:cover;border-radius:5px;border:1px solid var(--bdr);cursor:pointer;vertical-align:middle;transition:border-color .12s}
+.img-thumb:hover{border-color:#6366f1}
+
+.img-viewer{display:flex;justify-content:center;align-items:center}
+.img-viewer img{max-width:100%;max-height:80vh;object-fit:contain;border-radius:8px}
+
+@media(max-width:700px){
+  .hdr{padding:14px}
+  .main{padding:14px}
+  .hdr h1{font-size:16px}
+  .hdr-field input,.hdr-field select{min-width:100px}
+}
+
+/* ── Login screen ── */
+#loginOverlay{position:fixed;inset:0;background:var(--bg);z-index:9999;display:flex;align-items:center;justify-content:center;padding:20px;background-image:radial-gradient(ellipse at 60% 20%,rgba(99,102,241,.08) 0%,transparent 60%)}
+.login-card{background:var(--surf);border:1px solid var(--bdr);border-radius:16px;padding:40px 44px;width:100%;max-width:460px;box-shadow:0 24px 64px rgba(0,0,0,.7)}
+.login-logo{font-size:20px;font-weight:700;color:#fff;margin-bottom:4px;display:flex;align-items:center;gap:10px}
+.login-sub{font-size:13px;color:var(--muted);margin-bottom:28px;padding-bottom:24px;border-bottom:1px solid var(--bdr)}
+.login-field{display:flex;flex-direction:column;gap:5px;margin-bottom:14px}
+.login-field label{font-size:10px;text-transform:uppercase;letter-spacing:.5px;font-weight:600;color:var(--muted)}
+.login-field input,.login-field select{background:var(--surf2);border:1px solid var(--bdr);color:var(--txt);border-radius:8px;padding:11px 14px;font-size:14px;outline:none;font-family:inherit;width:100%;transition:border-color .15s}
+.login-field input:focus,.login-field select:focus{border-color:var(--ind)}
+.login-field input.invalid,.login-field select.invalid{border-color:var(--red)}
+#loginError{background:rgba(239,68,68,.15);color:#fca5a5;border:1px solid rgba(239,68,68,.4);border-radius:8px;padding:11px 14px;font-size:13px;margin-bottom:16px;display:none;line-height:1.5}
+.login-btn{width:100%;background:var(--ind);border:none;color:#fff;border-radius:8px;padding:13px;font-size:14px;font-weight:700;cursor:pointer;font-family:inherit;transition:background .15s;margin-top:6px;letter-spacing:.3px}
+.login-btn:hover{background:#4f46e5}
+.login-brand{text-align:center;font-size:11px;color:var(--muted);margin-top:22px;line-height:1.6}
+</style>
+</head>
+<body>
+
+<!-- ── Login screen ── -->
+<div id="loginOverlay">
+  <div class="login-card">
+    <div class="login-logo">🛠️ Daily Activity Log</div>
+    <div class="login-sub">Sign in to access your daily log</div>
+    <div id="loginError"></div>
+    <div class="login-field">
+      <label>User Name <span style="color:#fca5a5">*</span></label>
+      <input id="loginName" type="text" placeholder="Your full name" autocomplete="name" onkeydown="if(event.key==='Enter')submitLogin()">
+    </div>
+    <div class="login-field">
+      <label>Shift <span style="color:#fca5a5">*</span></label>
+      <select id="loginShift" onkeydown="if(event.key==='Enter')submitLogin()">
+        <option value="">— select shift —</option>
+        <option>1st shift</option>
+        <option>2nd shift</option>
+        <option>3rd shift</option>
+      </select>
+    </div>
+    <div class="login-field">
+      <label>Title <span style="color:#fca5a5">*</span></label>
+      <input id="loginTitle" type="text" placeholder="e.g. PLC · RB · Weld" onkeydown="if(event.key==='Enter')submitLogin()">
+    </div>
+    <div class="login-field">
+      <label>Email <span style="color:#fca5a5">*</span></label>
+      <input id="loginEmail" type="password" placeholder="" autocomplete="off" onkeydown="if(event.key==='Enter')submitLogin()">
+    </div>
+    <button class="login-btn" onclick="submitLogin()">Sign In →</button>
+    <div class="login-brand">
+      <span style="color:rgba(136,144,170,.5);font-size:11px">Authorized accounts only</span>
+    </div>
+  </div>
+</div>
+
+<div class="hdr">
+  <h1>🛠️ MBV Tech Daily Log</h1>
+  <div class="hdr-spacer"></div>
+  <button onclick="pullActionsFromFolder()" title="Pull latest team actions from the shared folder" style="background:transparent;border:1px solid var(--bdr);color:var(--txt);border-radius:8px;padding:8px 14px;font-size:12px;font-weight:600;cursor:pointer;display:flex;align-items:center;gap:6px;transition:border-color .15s,color .15s" onmouseover="this.style.borderColor='var(--ind)';this.style.color='#a5b4fc'" onmouseout="this.style.borderColor='var(--bdr)';this.style.color='var(--txt)'">🔄 Update Actions</button>
+  <div class="hdr-field">
+    <label>Tech Name</label>
+    <input id="techName" type="text" placeholder="Your name" onchange="onTechChanged()">
+  </div>
+  <div class="hdr-field">
+    <label>Shift</label>
+    <select id="shift" onchange="saveState()">
+      <option>1st shift</option>
+      <option>2nd shift</option>
+      <option>3rd shift</option>
+    </select>
+  </div>
+</div>
+
+<div class="tab-bar" id="tabBar">
+  <button class="tab-btn active" data-tab="log" onclick="switchTab('log')">📝 Daily Log <span class="count" id="cntLog">0</span></button>
+  <button class="tab-btn" data-tab="actions" onclick="switchTab('actions')">📋 Team Action Plan <span class="count" id="cntActions">0</span></button>
+  <button class="tab-btn" data-tab="history" onclick="switchTab('history')">📅 History <span class="count" id="cntHistory">0</span></button>
+  <button class="tab-btn" data-tab="export" onclick="switchTab('export')">📤 Export</button>
+  <button class="tab-btn" data-tab="sync" onclick="switchTab('sync')">⚙️ Sync</button>
+</div>
+
+<div class="main">
+
+  <!-- Daily Log section -->
+  <div class="section active" id="sec-log">
+    <div class="entries-row">
+      <div class="date-pick">
+        <label style="font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.5px">Logging Date:</label>
+        <input id="currentDate" type="date" class="form-input" style="width:170px" onchange="onDateChanged()">
+      </div>
+      <button class="btn" onclick="openEntryModal()">+ Add Entry</button>
+    </div>
+
+    <div class="card">
+      <div class="card-t">Today's entries <span id="todayCount" style="color:var(--muted);font-weight:400;font-size:11px">(0)</span></div>
+      <div class="card-s">All entries logged for the selected date. Click an entry to edit it.</div>
+      <div id="entriesList"></div>
+    </div>
+  </div>
+
+  <!-- Actions section (shared with the team) -->
+  <div class="section" id="sec-actions">
+    <div class="card">
+      <div class="card-t">Add a new team action</div>
+      <div class="card-s">Adds to the team's shared action list. <strong>You can add but cannot delete or close entries</strong> — those are managed by the supervisor.</div>
+      <div class="form-grid">
+        <div class="form-field"><label>Title <span class="req">*</span></label><input id="aTitle" class="form-input" placeholder="Short action title"></div>
+        <div class="form-field"><label>Owner</label><input id="aOwner" class="form-input" placeholder="Owner"></div>
+        <div class="form-field"><label>KPI / Reference</label><input id="aKPI" class="form-input" placeholder="KPI"></div>
+        <div class="form-field"><label>Due Date</label><input id="aDue" type="date" class="form-input"></div>
+        <div class="form-field"><label>Priority</label><select id="aPriority" class="form-select"><option>Low</option><option selected>Medium</option><option>High</option></select></div>
+        <div class="form-field full"><label>Comment</label><textarea id="aComment" class="form-textarea" placeholder="Details / context"></textarea></div>
+      </div>
+      <div class="img-attach-row">
+        <div class="img-attach-label">📎 Attach image (optional)</div>
+        <div class="img-attach-buttons">
+          <button class="btn btn-secondary btn-small" onclick="document.getElementById('imgFileInput').click()">📁 From file</button>
+          <button class="btn btn-secondary btn-small" onclick="openCameraForAction()">📸 Use camera</button>
+          <input id="imgFileInput" type="file" accept="image/*" style="display:none" onchange="onImageFileSelected(event)">
+        </div>
+        <div id="imgPreviewRow" class="img-preview-row" style="display:none">
+          <img id="imgPreviewImg" src="" alt="preview">
+          <div class="img-preview-info">
+            <div class="pname" id="imgPreviewName">attached</div>
+            <div class="psize" id="imgPreviewSize"></div>
+            <button class="btn btn-secondary btn-small" style="margin-top:6px" onclick="clearPendingImage()">✕ Remove image</button>
+          </div>
+        </div>
+      </div>
+      <div class="form-actions">
+        <button class="btn btn-green" onclick="addAction()">+ Add Action</button>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="entries-row">
+        <div>
+          <div class="card-t" style="margin:0">Team actions <span id="actionsCount" style="color:var(--muted);font-weight:400;font-size:11px">(0)</span></div>
+          <div style="font-size:11px;color:var(--muted);margin-top:3px">
+            <span id="actionsSyncStatus" class="sync-status muted">⊘ Not synced</span>
+          </div>
+        </div>
+        <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+          <select id="actFilterStatus" class="form-select" style="width:auto;padding:6px 10px;font-size:12px" onchange="renderActions()">
+            <option value="">All Status</option><option>Open</option><option>In Progress</option><option>Closed</option>
+          </select>
+          <select id="actFilterPriority" class="form-select" style="width:auto;padding:6px 10px;font-size:12px" onchange="renderActions()">
+            <option value="">All Priorities</option><option>Low</option><option>Medium</option><option>High</option>
+          </select>
+          <button class="btn btn-secondary btn-small" onclick="pullActionsFromFolder()" title="Re-read the shared team actions from the team folder">🔄 Pull latest</button>
+          <button id="autoSyncBtn" class="btn btn-secondary btn-small" onclick="toggleAutoSync()" title="Auto-sync every 5 minutes — reads team changes and pushes any local entries" style="transition:border-color .2s,color .2s">⏱ Auto-sync: OFF</button>
+        </div>
+      </div>
+      <div class="tbl-wrap">
+        <table>
+          <thead><tr><th>Title</th><th>Owner</th><th>KPI</th><th>Priority</th><th>Status</th><th>Due</th><th>Comment</th><th>Added by</th></tr></thead>
+          <tbody id="actionsBody"></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <!-- History section -->
+  <div class="section" id="sec-history">
+    <div class="card">
+      <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:12px;flex-wrap:wrap">
+        <div>
+          <div class="card-t">My logged days</div>
+          <div class="card-s">All days you've logged entries on. Click a date to jump into editing it.</div>
+        </div>
+        <div style="display:flex;align-items:center;gap:10px;flex-shrink:0;padding-top:2px">
+          <label style="font-size:12px;color:var(--muted);display:flex;align-items:center;gap:5px;cursor:pointer;white-space:nowrap;user-select:none">
+            <input type="checkbox" id="histSelectAll" onchange="toggleSelectAllHistory(this.checked)" style="accent-color:var(--ind);width:14px;height:14px;cursor:pointer"> Select all
+          </label>
+          <div style="position:relative">
+            <button id="histExportBtn" class="btn btn-small" onclick="toggleHistoryExportMenu()" style="display:flex;align-items:center;gap:5px;white-space:nowrap">📤 Export <span id="histExportCount" style="color:var(--ind)"></span><span style="font-size:10px;opacity:.7">▾</span></button>
+            <div id="histExportMenu" style="display:none;position:absolute;right:0;top:calc(100% + 4px);background:var(--surf2);border:1px solid var(--bdr);border-radius:8px;min-width:175px;z-index:200;overflow:hidden;box-shadow:0 6px 20px rgba(0,0,0,.5)">
+              <button onclick="exportSelectedLocally()" style="width:100%;background:none;border:none;color:var(--txt);text-align:left;padding:10px 14px;font-size:13px;cursor:pointer;font-family:inherit" onmouseover="this.style.background='rgba(255,255,255,.06)'" onmouseout="this.style.background='none'">📁 Save locally</button>
+              <button onclick="exportSelectedByEmail()" style="width:100%;background:none;border:none;color:var(--txt);text-align:left;padding:10px 14px;font-size:13px;cursor:pointer;font-family:inherit;border-top:1px solid var(--bdr)" onmouseover="this.style.background='rgba(255,255,255,.06)'" onmouseout="this.style.background='none'">✉️ Send by email</button>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div id="historyList"></div>
+    </div>
+  </div>
+
+  <!-- Export section -->
+  <div class="section" id="sec-export">
+    <div class="card">
+      <div class="card-t">📤 Export your daily report</div>
+      <div class="card-s">Saves an xlsx file in the format the manager dashboard imports.</div>
+      <p style="font-size:13px;line-height:1.7;color:var(--txt);margin-bottom:12px">
+        File name: <code style="background:var(--surf2);padding:2px 6px;border-radius:4px">BodyDailyLog_YourName_06_03_2026.xlsx</code>.
+        If a team folder is linked under Sync, files save directly there. Otherwise they download.
+      </p>
+      <div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:14px">
+        <button class="btn btn-green" onclick="exportCurrentDate()">📁 Save current day (<span id="exportCurDate">today</span>)</button>
+        <button class="btn" onclick="exportAllDays()">📁 Save every logged day</button>
+        <button class="btn btn-secondary" onclick="sendCurrentDateByEmail()">✉️ Send by email</button>
+      </div>
+      <div id="lastExportInfo" style="margin-top:14px;font-size:11px;color:var(--muted)"></div>
+    </div>
+
+    <div class="card">
+      <div class="card-t">💾 Backup &amp; restore</div>
+      <div class="card-s">If you change browsers or computers, back up your data here.</div>
+      <div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:8px">
+        <button class="btn btn-secondary" onclick="backupJson()">Download backup (JSON)</button>
+        <button class="btn btn-secondary" onclick="document.getElementById('restoreFile').click()">Restore from backup</button>
+        <input id="restoreFile" type="file" accept=".json" style="display:none" onchange="restoreJson(event)">
+        <button class="btn btn-danger" onclick="resetAll()">Clear all my data</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Sync section -->
+  <div class="section" id="sec-sync">
+    <div class="card">
+      <div class="card-t">⚙️ Team folder</div>
+      <div class="card-s">Pick the shared folder where the team drops their daily reports. The shared action plan and saved exports use the same folder.</div>
+      <div class="folder-card" id="folderCard">
+        <div>
+          <div style="font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;margin-bottom:4px">Linked folder</div>
+          <div id="folderName" class="none">No folder linked yet</div>
+        </div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap">
+          <button class="btn" onclick="pickTeamFolder()">📁 Pick folder</button>
+          <button class="btn btn-secondary btn-small" onclick="unlinkTeamFolder()" id="unlinkBtn" style="display:none">Unlink</button>
+        </div>
+      </div>
+      <div style="margin-top:12px;font-size:12px;color:var(--muted)">
+        Click <strong>Pick folder</strong>, then choose the shared OneDrive/SharePoint folder your team uses (the same folder the manager points at).
+        Edge/Chrome will ask for permission once; subsequent opens auto-reuse the same folder.
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-t">🔄 Update from team folder</div>
+      <div class="card-s">Pulls the latest team action plan and lists the most recent reports your teammates dropped.</div>
+      <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-top:8px">
+        <button class="btn" onclick="updateFromFolder()">🔄 Update now</button>
+        <span id="updateStatus" class="sync-status muted">⊘ Not synced yet</span>
+      </div>
+      <div id="recentReports" style="margin-top:14px"></div>
+    </div>
+
+    <div class="card">
+      <div class="card-t">✉️ Email settings</div>
+      <div class="card-s">Used by the "Send by email" button on the Export tab.</div>
+      <div class="form-grid">
+        <div class="form-field full">
+          <label>Supervisor email</label>
+          <input id="managerEmail" type="email" class="form-input" placeholder="supervisor@mbv.com" onchange="saveState()">
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Entry add/edit modal -->
+<div class="modal-overlay" id="entryModal" onclick="if(event.target===this)closeEntryModal()">
+  <div class="modal-box">
+    <div class="modal-hdr">
+      <h3 id="entryModalTitle">Add Entry</h3>
+      <button class="btn btn-secondary btn-small" onclick="closeEntryModal()">Close</button>
+    </div>
+    <div class="modal-body">
+      <div id="entryValidationError" style="display:none;background:rgba(239,68,68,.15);color:#fca5a5;border:1px solid rgba(239,68,68,.4);border-radius:6px;padding:10px 14px;font-size:12px;margin-bottom:12px">
+        <strong>Please fill in all required fields:</strong>
+        <ul id="entryValidationList" style="margin:6px 0 0 0;padding-left:18px;line-height:1.7"></ul>
+      </div>
+      <div class="form-grid">
+        <div class="form-field"><label>Line / Location <span class="req">*</span></label><input id="eLine" class="form-input" placeholder="e.g. Z1_150_60"></div>
+        <div class="form-field"><label>MBV Contact <span class="req">*</span></label><input id="eContact" class="form-input" placeholder="Who requested? Can be 'A / B' for multiple"></div>
+        <div class="form-field"><label>Initial Down Time <span class="req">*</span></label><input id="eIni" type="time" class="form-input"></div>
+        <div class="form-field"><label>Time Called by MBV <span class="req">*</span></label><input id="eCalled" type="time" class="form-input" onchange="calcTotalDowntime()"></div>
+        <div class="form-field"><label>Time Running Again <span class="req">*</span></label><input id="eRun" type="time" class="form-input" onchange="calcTotalDowntime()"></div>
+        <div class="form-field"><label>Total Downtime (H:MM) <span class="req">*</span></label><input id="eTotalDt" type="text" class="form-input" placeholder="0:30"></div>
+        <div class="form-field"><label>Follow-up Time (H:MM) <span class="req">*</span></label><input id="eFollowup" type="text" class="form-input" placeholder="0:05"></div>
+        <div class="form-field"><label>Classification <span class="req">*</span></label>
+          <select id="eClassification" class="form-select">
+            <option value="">— pick one —</option>
+            <option>Downtime</option><option>Investigating</option><option>Project</option><option>Training</option><option>No Activities</option>
+          </select>
+        </div>
+        <div class="form-field full"><label>Activity <span class="req">*</span></label><textarea id="eActivity" class="form-textarea" placeholder="What was the issue / what was done"></textarea></div>
+        <div class="form-field full"><label>Countermeasure / Recovery Actions <span class="req">*</span></label><textarea id="eCountermeasure" class="form-textarea" placeholder="Steps taken to recover"></textarea></div>
+        <div class="form-field full"><label>Root Cause <span class="req">*</span></label><textarea id="eRootCause" class="form-textarea" placeholder="Why it happened"></textarea></div>
+        <div class="form-field full"><label>Comments</label><textarea id="eComments" class="form-textarea" placeholder="Anything else"></textarea></div>
+      </div>
+      <div class="img-attach-row">
+        <div class="img-attach-label">📎 Attach image (optional)</div>
+        <div class="img-attach-buttons">
+          <button class="btn btn-secondary btn-small" onclick="document.getElementById('entryImgFileInput').click()">📁 From file</button>
+          <button class="btn btn-secondary btn-small" onclick="openCameraForEntry()">📸 Use camera</button>
+          <input id="entryImgFileInput" type="file" accept="image/*" style="display:none" onchange="onEntryImageFileSelected(event)">
+        </div>
+        <div id="entryImgPreviewRow" class="img-preview-row" style="display:none">
+          <img id="entryImgPreviewImg" src="" alt="preview">
+          <div class="img-preview-info">
+            <div class="pname" id="entryImgPreviewName">attached</div>
+            <div class="psize" id="entryImgPreviewSize"></div>
+            <button class="btn btn-secondary btn-small" style="margin-top:6px" onclick="clearEntryImage()">✕ Remove image</button>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="modal-foot">
+      <button class="btn btn-danger" id="entryDeleteBtn" onclick="deleteCurrentEntry()" style="display:none">Delete</button>
+      <div style="flex:1"></div>
+      <button class="btn btn-secondary" onclick="closeEntryModal()">Cancel</button>
+      <button class="btn btn-green" onclick="saveEntry()">Save</button>
+    </div>
+  </div>
+</div>
+
+<!-- (Action edit modal removed — techs cannot edit, close, or delete shared actions) -->
+
+<!-- Camera capture modal -->
+<div class="modal-overlay" id="cameraModal" onclick="if(event.target===this)closeCameraModal()">
+  <div class="modal-box" style="max-width:720px">
+    <div class="modal-hdr">
+      <h3>📸 Take Photo</h3>
+      <button class="btn btn-secondary btn-small" onclick="closeCameraModal()">Close</button>
+    </div>
+    <div class="modal-body">
+      <div id="camStage" class="cam-stage">
+        <video id="camVideo" autoplay playsinline muted></video>
+        <canvas id="camCanvas"></canvas>
+      </div>
+      <div id="camPreviewWrap" class="cam-preview" style="display:none">
+        <img id="camPreviewImg" alt="captured">
+      </div>
+      <div id="camStatus" class="cam-status"></div>
+    </div>
+    <div class="modal-foot">
+      <button class="btn btn-secondary" onclick="closeCameraModal()">Cancel</button>
+      <div style="flex:1"></div>
+      <div id="captureBtns" style="display:flex;gap:10px">
+        <button class="btn btn-green" onclick="capturePhoto()">📸 Capture</button>
+      </div>
+      <div id="confirmBtns" style="display:none;gap:10px">
+        <button class="btn btn-secondary" onclick="retakePhoto()">↻ Retake</button>
+        <button class="btn btn-green" onclick="acceptPhoto()">✓ Use this photo</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Image viewer modal -->
+<div class="modal-overlay" id="imageViewerModal" onclick="if(event.target===this)closeImageViewer()">
+  <div class="modal-box" style="max-width:1000px">
+    <div class="modal-hdr">
+      <h3 id="imageViewerTitle">Image</h3>
+      <button class="btn btn-secondary btn-small" onclick="closeImageViewer()">Close</button>
+    </div>
+    <div class="modal-body img-viewer">
+      <img id="viewerImg" src="" alt="">
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+// ════════════════════════════════════════════════════════════════════════════
+// State + persistence
+// ════════════════════════════════════════════════════════════════════════════
+var STORAGE_KEY = 'mbvTechLog_v1';
+var state = {
+  techName: '',
+  shift: '2nd shift',
+  managerEmail: '',
+  folderName: '',
+  entriesByDate: {},   // 'YYYY-MM-DD' -> array of entries
+  actions: [],
+  currentDate: todayIso(),
+  currentTab: 'log'
+};
+var _editingEntryId = null;
+var _editingActionId = null;
+
+function todayIso() {
+  var d = new Date();
+  return d.getFullYear() + '-' + pad2(d.getMonth()+1) + '-' + pad2(d.getDate());
+}
+function pad2(n){ return (n < 10 ? '0' : '') + n; }
+function makeId(){ return Date.now().toString(36) + '-' + Math.random().toString(36).slice(2,8); }
+function esc(s){ return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+function escNl(s){ return esc(s).replace(/\r\n|\r|\n/g,'<br>'); }
+
+function loadState() {
+  try {
+    var raw = localStorage.getItem(STORAGE_KEY);
+    if (raw) {
+      var p = JSON.parse(raw);
+      if (p && typeof p === 'object') Object.assign(state, p);
+    }
+  } catch (e) { console.warn('load failed', e); }
+  if (!state.currentDate) state.currentDate = todayIso();
+}
+function saveState() {
+  var n = document.getElementById('techName'); if (n) state.techName = n.value.trim();
+  var s = document.getElementById('shift');    if (s) state.shift    = s.value;
+  var m = document.getElementById('managerEmail'); if (m) state.managerEmail = m.value.trim();
+  try { localStorage.setItem(STORAGE_KEY, JSON.stringify(state)); }
+  catch (e) { toast('Save failed: ' + (e.message||e), 'err'); }
+}
+
+// ════════════════════════════════════════════════════════════════════════════
+// Toast
+// ════════════════════════════════════════════════════════════════════════════
+function toast(msg, kind) {
+  var t = document.getElementById('toast');
+  t.textContent = msg;
+  t.className = 'toast show' + (kind ? ' ' + kind : '');
+  clearTimeout(toast._timer);
+  toast._timer = setTimeout(function(){ t.classList.remove('show'); }, 4000);
+}
+
+// ════════════════════════════════════════════════════════════════════════════
+// Tabs
+// ════════════════════════════════════════════════════════════════════════════
+function switchTab(name) {
+  state.currentTab = name;
+  ['log','actions','history','export','sync'].forEach(function(t){
+    var btn = document.querySelector('[data-tab="'+t+'"]');
+    var sec = document.getElementById('sec-'+t);
+    if (btn) btn.classList.toggle('active', t === name);
+    if (sec) sec.classList.toggle('active', t === name);
+  });
+  if (name === 'history') renderHistory();
+  if (name === 'export') updateExportLabel();
+  if (name === 'sync')   renderFolderCard();
+  saveState();
+}
+
+// ════════════════════════════════════════════════════════════════════════════
+// Daily Log entries
+// ════════════════════════════════════════════════════════════════════════════
+function onDateChanged() {
+  state.currentDate = document.getElementById('currentDate').value || todayIso();
+  saveState();
+  renderEntries();
+}
+function onTechChanged() {
+  saveState();
+}
+
+function openEntryModal(id) {
+  _editingEntryId = id || null;
+  var modal = document.getElementById('entryModal');
+  document.getElementById('entryModalTitle').textContent = id ? 'Edit Entry' : 'Add Entry';
+  document.getElementById('entryDeleteBtn').style.display = id ? 'inline-block' : 'none';
+  // Reset / populate
+  var fields = {eLine:'', eContact:'', eIni:'', eCalled:'', eRun:'', eTotalDt:'', eFollowup:'', eClassification:'', eActivity:'', eCountermeasure:'', eRootCause:'', eComments:''};
+  _pendingEntryImage = null;
+  if (id) {
+    var entry = (state.entriesByDate[state.currentDate] || []).find(function(e){return e.id===id;});
+    if (entry) {
+      fields.eLine = entry.line; fields.eContact = entry.contact;
+      fields.eIni = entry.ini; fields.eCalled = entry.called; fields.eRun = entry.run;
+      fields.eTotalDt = entry.totalDt; fields.eFollowup = entry.followup;
+      fields.eClassification = entry.classification || '';
+      fields.eActivity = entry.activity; fields.eCountermeasure = entry.countermeasure;
+      fields.eRootCause = entry.rootCause; fields.eComments = entry.comments;
+      if (entry.image) _pendingEntryImage = entry.image;
+    }
+  }
+  Object.keys(fields).forEach(function(k){
+    var el = document.getElementById(k);
+    if (el) el.value = fields[k] || '';
+  });
+  // Auto-populate Initial Down Time with current time for new entries
+  if (!id) {
+    var now = new Date();
+    var hh = String(now.getHours()).padStart(2, '0');
+    var mm = String(now.getMinutes()).padStart(2, '0');
+    var iniEl = document.getElementById('eIni');
+    if (iniEl) iniEl.value = hh + ':' + mm;
+  }
+  // Clear any prior validation error
+  var ve = document.getElementById('entryValidationError');
+  if (ve) ve.style.display = 'none';
+  // Refresh image preview row
+  if (_pendingEntryImage) showEntryImagePreview(_pendingEntryImage, 'Attached image');
+  else                    showEntryImagePreview(null);
+  var fi = document.getElementById('entryImgFileInput');
+  if (fi) fi.value = '';
+  modal.classList.add('show');
+  document.body.style.overflow = 'hidden';
+}
+function closeEntryModal() {
+  document.getElementById('entryModal').classList.remove('show');
+  document.body.style.overflow = '';
+  _editingEntryId = null;
+  _pendingEntryImage = null;
+  showEntryImagePreview(null);
+  var fi = document.getElementById('entryImgFileInput');
+  if (fi) fi.value = '';
+  var ve = document.getElementById('entryValidationError');
+  if (ve) ve.style.display = 'none';
+}
+function calcTotalDowntime() {
+  var calledVal = document.getElementById('eCalled').value;
+  var runVal    = document.getElementById('eRun').value;
+  if (!calledVal || !runVal) return;
+  var toMins = function(t) { var p = t.split(':'); return parseInt(p[0], 10) * 60 + parseInt(p[1], 10); };
+  var start  = toMins(calledVal);
+  var end    = toMins(runVal);
+  var diff   = end >= start ? end - start : end + 1440 - start; // handle midnight crossover
+  var h      = Math.floor(diff / 60);
+  var m      = String(diff % 60).padStart(2, '0');
+  var dtEl   = document.getElementById('eTotalDt');
+  if (dtEl) dtEl.value = h + ':' + m;
+}
+function saveEntry() {
+  var line           = document.getElementById('eLine').value.trim();
+  var contact        = document.getElementById('eContact').value.trim();
+  var ini            = document.getElementById('eIni').value;
+  var called         = document.getElementById('eCalled').value;
+  var run            = document.getElementById('eRun').value;
+  var totalDt        = document.getElementById('eTotalDt').value.trim();
+  var followup       = document.getElementById('eFollowup').value.trim();
+  var classification = document.getElementById('eClassification').value;
+  var activity       = document.getElementById('eActivity').value.trim();
+  var countermeasure = document.getElementById('eCountermeasure').value.trim();
+  var rootCause      = document.getElementById('eRootCause').value.trim();
+  var comments       = document.getElementById('eComments').value.trim();
+
+  var missing = [];
+  if (!line)           missing.push('Line / Location');
+  if (!contact)        missing.push('MBV Contact');
+  if (!ini)            missing.push('Initial Down Time');
+  if (!called)         missing.push('Time Called by MBV');
+  if (!run)            missing.push('Time Running Again');
+  if (!totalDt)        missing.push('Total Downtime (H:MM)');
+  if (!followup)       missing.push('Follow-up Time (H:MM)');
+  if (!classification) missing.push('Classification');
+  if (!activity)       missing.push('Activity');
+  if (!countermeasure) missing.push('Countermeasure / Recovery Actions');
+  if (!rootCause)      missing.push('Root Cause');
+
+  var ve = document.getElementById('entryValidationError');
+  var vl = document.getElementById('entryValidationList');
+  if (missing.length) {
+    vl.innerHTML = missing.map(function(f){ return '<li>' + f + '</li>'; }).join('');
+    ve.style.display = 'block';
+    ve.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    return;
+  }
+  ve.style.display = 'none';
+
+  var entry = {
+    id:             _editingEntryId || makeId(),
+    line:           line,
+    contact:        contact,
+    ini:            ini,
+    called:         called,
+    run:            run,
+    totalDt:        totalDt,
+    followup:       followup,
+    classification: classification,
+    activity:       activity,
+    countermeasure: countermeasure,
+    rootCause:      rootCause,
+    comments:       comments,
+    image:          _pendingEntryImage || null
+  };
+  if (!state.entriesByDate[state.currentDate]) state.entriesByDate[state.currentDate] = [];
+  if (_editingEntryId) {
+    var arr = state.entriesByDate[state.currentDate];
+    var idx = arr.findIndex(function(e){return e.id===_editingEntryId;});
+    if (idx >= 0) arr[idx] = entry; else arr.push(entry);
+  } else {
+    state.entriesByDate[state.currentDate].push(entry);
+  }
+  saveState();
+  closeEntryModal();
+  renderEntries();
+  toast(_editingEntryId ? 'Entry updated' : 'Entry added', 'ok');
+}
+function deleteCurrentEntry() {
+  if (!_editingEntryId) return;
+  if (!confirm('Delete this entry?')) return;
+  var arr = state.entriesByDate[state.currentDate] || [];
+  state.entriesByDate[state.currentDate] = arr.filter(function(e){return e.id !== _editingEntryId;});
+  saveState();
+  closeEntryModal();
+  renderEntries();
+  toast('Entry deleted', 'ok');
+}
+
+function renderEntries() {
+  document.getElementById('currentDate').value = state.currentDate;
+  var entries = state.entriesByDate[state.currentDate] || [];
+  // Sort by time_in
+  entries.sort(function(a,b){
+    var at = a.called || a.ini || '~', bt = b.called || b.ini || '~';
+    return at < bt ? -1 : at > bt ? 1 : 0;
+  });
+  document.getElementById('todayCount').textContent = '(' + entries.length + ')';
+  document.getElementById('cntLog').textContent = entries.length;
+  var list = document.getElementById('entriesList');
+  if (!entries.length) {
+    list.innerHTML = '<div class="empty">No entries yet for this date. Click + Add Entry to log your first one.</div>';
+    return;
+  }
+  list.innerHTML = entries.map(function(e){
+    var clsCss = (e.classification || '').replace(/\s+/g,'-');
+    var clsBadge = e.classification ? '<span class="cls-badge cls-'+clsCss+'">'+esc(e.classification)+'</span>' : '';
+    var times = [e.ini, e.called, e.run].filter(Boolean).join(' → ');
+    var dur = e.totalDt || e.followup ? ((e.totalDt||'')+(e.followup?(' + '+e.followup):'')) : '';
+    var timeText = times || 'No time recorded';
+    var timeClass = times ? '' : 'warn';
+    var thumb = '';
+    if (e.image) {
+      window._entryImages[e.id] = e.image;
+      var ttl = (e.line || 'Entry') + ' · ' + (times || 'no time');
+      thumb = '<img class="img-thumb" src="' + e.image + '" alt="" onclick="event.stopPropagation();openImageViewer(window._entryImages[\'' + e.id + '\'], \'' + esc(ttl).replace(/'/g,"\\'") + '\')" title="Click to view full size" style="margin-left:auto"> ';
+    }
+    return '<div class="entry-card" onclick="openEntryModal(\''+e.id+'\')" style="cursor:pointer">'
+      + '<div class="entry-card-hdr">'
+        + '<span class="entry-line">' + esc(e.line || '—') + '</span>'
+        + clsBadge
+        + '<span class="entry-time ' + timeClass + '">' + (times ? '⏱ ' : '⚠ ') + esc(timeText) + (dur ? ' · ' + esc(dur) : '') + '</span>'
+        + thumb
+      + '</div>'
+      + (e.contact ? '<div class="entry-meta">Contact: <strong>' + esc(e.contact) + '</strong></div>' : '')
+      + '<div class="entry-act">' + esc(e.activity) + '</div>'
+      + '</div>';
+  }).join('');
+}
+
+// ════════════════════════════════════════════════════════════════════════════
+// Actions plan
+// ════════════════════════════════════════════════════════════════════════════
+async function addAction() {
+  var title = document.getElementById('aTitle').value.trim();
+  if (!title) { toast('Action title is required', 'err'); return; }
+  if (!state.techName) { toast('Please enter your name in the top bar first', 'err'); return; }
+  var newAction = {
+    id:        makeId(),
+    title:     title,
+    owner:     document.getElementById('aOwner').value.trim(),
+    kpi:       document.getElementById('aKPI').value.trim(),
+    dueDate:   document.getElementById('aDue').value,
+    priority:  document.getElementById('aPriority').value || 'Medium',
+    comment:   document.getElementById('aComment').value.trim(),
+    image:     _pendingActionImage || null,   // attached image (data URL) or null
+    status:    'Open',
+    createdBy: state.techName,
+    createdAt: new Date().toISOString()
+  };
+  // Try to merge into the shared file first so we don't overwrite teammates' adds
+  try {
+    if (await ensureTeamFolderReadWrite()) {
+      var remote = await readSharedActions();
+      // Merge: keep any remote actions we don't already have, then add the new one
+      var byId = {};
+      (remote || []).forEach(function(a){ if (a && a.id) byId[a.id] = a; });
+      state.actions.forEach(function(a){ if (a && a.id) byId[a.id] = a; });
+      byId[newAction.id] = newAction;
+      state.actions = Object.values(byId);
+      await writeSharedActions(state.actions);
+      setSyncStatus('ok', '✓ Synced to team folder');
+    } else {
+      // No folder linked yet — keep local-only
+      state.actions.push(newAction);
+      setSyncStatus('warn', '⚠ Saved locally only (no team folder linked)');
+    }
+  } catch (e) {
+    console.warn('share failed', e);
+    state.actions.push(newAction);
+    setSyncStatus('err', '⚠ Could not sync to team folder');
+  }
+  saveState();
+  // Clear form (including pending image)
+  ['aTitle','aOwner','aKPI','aDue','aComment'].forEach(function(id){ document.getElementById(id).value=''; });
+  document.getElementById('aPriority').value = 'Medium';
+  clearPendingImage();
+  renderActions();
+  toast('Action added' + (state.techName ? ' by ' + state.techName : ''), 'ok');
+}
+
+async function pullActionsFromFolder() {
+  try {
+    if (!await ensureTeamFolderRead()) {
+      toast('Pick a team folder first under Sync', 'err');
+      return;
+    }
+    var remote = await readSharedActions();
+    if (!remote) { setSyncStatus('warn', '⊘ No team-actions file yet'); toast('No team-actions file yet', 'err'); return; }
+    state.actions = remote;
+    saveState();
+    renderActions();
+    setSyncStatus('ok', '✓ Pulled at ' + new Date().toLocaleTimeString());
+    toast('Pulled ' + remote.length + ' team action' + (remote.length===1?'':'s'), 'ok');
+  } catch (e) {
+    console.error(e);
+    setSyncStatus('err', '⚠ Pull failed');
+    toast('Pull failed: ' + (e.message || e), 'err');
+  }
+}
+
+var _autoSyncTimer    = null;
+var _AUTO_SYNC_MS     = 5 * 60 * 1000; // 5 minutes
+
+function toggleAutoSync() {
+  var btn = document.getElementById('autoSyncBtn');
+  if (_autoSyncTimer) {
+    clearInterval(_autoSyncTimer);
+    _autoSyncTimer = null;
+    if (btn) { btn.textContent = '⏱ Auto-sync: OFF'; btn.style.borderColor = ''; btn.style.color = ''; }
+    setSyncStatus('muted', '⊘ Auto-sync off');
+  } else {
+    if (btn) { btn.textContent = '⏱ Auto-sync: ON'; btn.style.borderColor = '#10b981'; btn.style.color = '#6ee7b7'; }
+    autoSyncTick();                                          // run immediately
+    _autoSyncTimer = setInterval(autoSyncTick, _AUTO_SYNC_MS);
+  }
+}
+
+async function autoSyncTick() {
+  try {
+    if (!await ensureTeamFolderReadWrite()) {
+      setSyncStatus('warn', '⚠ Auto-sync: no folder linked');
+      return;
+    }
+    var remote = await readSharedActions();
+    if (!remote) return;
+
+    // Merge: remote wins for any shared ID (picks up supervisor edits/closures),
+    // local-only entries (not yet in the file) get pushed up.
+    var byId = {};
+    remote.forEach(function(a){ if (a && a.id) byId[a.id] = a; });
+    var hadLocalOnly = false;
+    state.actions.forEach(function(a){
+      if (a && a.id && !byId[a.id]) { byId[a.id] = a; hadLocalOnly = true; }
+    });
+    var merged = Object.values(byId);
+
+    if (hadLocalOnly) await writeSharedActions(merged); // push local-only entries
+
+    state.actions = merged;
+    saveState();
+    renderActions();
+    setSyncStatus('ok', '✓ Auto-synced ' + new Date().toLocaleTimeString());
+  } catch (e) {
+    console.warn('auto-sync tick failed', e);
+    setSyncStatus('err', '⚠ Auto-sync failed');
+  }
+}
+
+function setSyncStatus(kind, text) {
+  var el = document.getElementById('actionsSyncStatus');
+  if (!el) return;
+  el.className = 'sync-status ' + (kind || 'muted');
+  el.textContent = text;
+}
+
+function dueInfo(dueDate, status) {
+  if (!dueDate) return { text: '—', cls: '' };
+  if (status === 'Closed') return { text: dueDate, cls: 'due-closed' };
+  var d = new Date(dueDate + 'T00:00:00');
+  if (isNaN(d.getTime())) return { text: dueDate, cls: '' };
+  var today = new Date(); today.setHours(0,0,0,0);
+  var diff = Math.floor((d.getTime() - today.getTime()) / 86400000);
+  var cls, suf;
+  if (diff < 0)       { cls='due-past'; suf=' · '+Math.abs(diff)+'d late'; }
+  else if (diff === 0){ cls='due-soon'; suf=' · due today'; }
+  else if (diff <= 3) { cls='due-soon'; suf=' · in '+diff+'d'; }
+  else                { cls='due-ok';   suf=''; }
+  return { text: dueDate + suf, cls: cls };
+}
+
+function renderActions() {
+  var fS = document.getElementById('actFilterStatus').value;
+  var fP = document.getElementById('actFilterPriority').value;
+  var list = state.actions.filter(function(a){
+    if (fS && a.status   !== fS) return false;
+    if (fP && a.priority !== fP) return false;
+    return true;
+  });
+  list.sort(function(a,b){
+    var sa = (a.status === 'Closed') ? 1 : 0;
+    var sb = (b.status === 'Closed') ? 1 : 0;
+    if (sa !== sb) return sa - sb;
+    var da = a.dueDate || '~', db = b.dueDate || '~';
+    return da < db ? -1 : da > db ? 1 : 0;
+  });
+  document.getElementById('actionsCount').textContent = '(' + list.length + ')';
+  document.getElementById('cntActions').textContent = state.actions.length;
+  var tbody = document.getElementById('actionsBody');
+  if (!list.length) {
+    tbody.innerHTML = '<tr><td colspan="8" style="text-align:center;padding:24px;color:var(--muted);font-style:italic">No actions yet. Add one above.</td></tr>';
+    return;
+  }
+  tbody.innerHTML = list.map(function(a){
+    var pri = a.priority || 'Medium';
+    var st  = a.status || 'Open';
+    var stCls = st.replace(/\s+/g,'-');
+    var due = dueInfo(a.dueDate, st);
+    var author = a.createdBy ? '<span class="author-tag">'+esc(a.createdBy)+'</span>' : '<span style="color:var(--muted);font-style:italic">unknown</span>';
+    var thumb = '';
+    if (a.image) {
+      // Stash on window so the inline onclick can find it without passing the giant data URL through HTML
+      window._actionImages[a.id] = a.image;
+      thumb = '<img class="img-thumb" src="' + a.image + '" alt="" onclick="event.stopPropagation();openImageViewer(window._actionImages[\'' + a.id + '\'], \'' + esc(a.title).replace(/'/g,"\\'") + '\')" title="Click to view full size"> ';
+    }
+    return '<tr>'
+      + '<td style="max-width:240px;word-break:break-word">' + thumb + esc(a.title) + '</td>'
+      + '<td>' + esc(a.owner) + '</td>'
+      + '<td>' + esc(a.kpi) + '</td>'
+      + '<td><span class="priority-badge priority-' + pri + '">' + pri + '</span></td>'
+      + '<td><span class="status-badge status-' + stCls + '">' + st + '</span></td>'
+      + '<td class="' + due.cls + '" style="white-space:nowrap">' + due.text + '</td>'
+      + '<td class="act-cell">' + esc(a.comment) + '</td>'
+      + '<td style="white-space:nowrap">' + author + '</td>'
+    + '</tr>';
+  }).join('');
+}
+
+// ════════════════════════════════════════════════════════════════════════════
+// History
+// ════════════════════════════════════════════════════════════════════════════
+function renderHistory() {
+  var dates = Object.keys(state.entriesByDate)
+    .filter(function(d){ return state.entriesByDate[d] && state.entriesByDate[d].length; })
+    .sort();
+  document.getElementById('cntHistory').textContent = dates.length;
+  var list = document.getElementById('historyList');
+  if (!dates.length) {
+    list.innerHTML = '<div class="empty">No history yet. Logged days will show up here.</div>';
+    return;
+  }
+  dates.reverse(); // newest first
+  list.innerHTML = dates.map(function(d){
+    var count = state.entriesByDate[d].length;
+    return '<div class="entry-card" style="display:flex;align-items:center;gap:12px">'
+      + '<input type="checkbox" class="hist-check" value="' + d + '" onclick="event.stopPropagation();updateHistoryExportBtn()" style="width:15px;height:15px;flex-shrink:0;cursor:pointer;accent-color:var(--ind)">'
+      + '<div style="flex:1;cursor:pointer;padding:4px 0" onclick="jumpToDate(\''+d+'\')">'
+      + '<strong style="font-size:14px">' + d + '</strong>'
+      + ' &nbsp;<span style="color:var(--muted);font-size:12px">' + count + ' entr' + (count===1?'y':'ies') + '</span>'
+      + '</div>'
+    + '</div>';
+  }).join('');
+  updateHistoryExportBtn();
+}
+function jumpToDate(d) {
+  state.currentDate = d;
+  saveState();
+  switchTab('log');
+  renderEntries();
+}
+function toggleSelectAllHistory(checked) {
+  document.querySelectorAll('.hist-check').forEach(function(cb){ cb.checked = checked; });
+  updateHistoryExportBtn();
+}
+function updateHistoryExportBtn() {
+  var all      = document.querySelectorAll('.hist-check');
+  var checked  = document.querySelectorAll('.hist-check:checked');
+  var countEl  = document.getElementById('histExportCount');
+  if (countEl) countEl.textContent = checked.length ? '(' + checked.length + ') ' : '';
+  var selAll = document.getElementById('histSelectAll');
+  if (selAll) selAll.checked = all.length > 0 && checked.length === all.length;
+}
+function toggleHistoryExportMenu() {
+  var checked = document.querySelectorAll('.hist-check:checked');
+  if (!checked.length) { toast('Select at least one day first', 'err'); return; }
+  var menu = document.getElementById('histExportMenu');
+  if (menu) menu.style.display = menu.style.display === 'none' ? 'block' : 'none';
+}
+function getSelectedHistoryDates() {
+  return Array.from(document.querySelectorAll('.hist-check:checked')).map(function(cb){ return cb.value; });
+}
+async function exportSelectedLocally() {
+  document.getElementById('histExportMenu').style.display = 'none';
+  if (!state.techName) { toast('Please enter your name first', 'err'); return; }
+  var dates = getSelectedHistoryDates();
+  if (!dates.length) { toast('No days selected', 'err'); return; }
+  var saved = 0;
+  for (var i = 0; i < dates.length; i++) {
+    var wb    = buildWorkbookForDate(dates[i]);
+    var fname = 'BodyDailyLog_' + _safeName(state.techName) + '_' + _dateToFileParts(dates[i]) + '.xlsx';
+    var result = await saveXlsxWithPicker(wb, fname);
+    if (result) saved++;
+  }
+  if (saved) toast('Saved ' + saved + ' file' + (saved > 1 ? 's' : ''), 'ok');
+}
+async function exportSelectedByEmail() {
+  document.getElementById('histExportMenu').style.display = 'none';
+  if (!state.techName) { toast('Please enter your name first', 'err'); return; }
+  var dates = getSelectedHistoryDates();
+  if (!dates.length) { toast('No days selected', 'err'); return; }
+  var fileInfos = dates.map(function(d) {
+    var wb    = buildWorkbookForDate(d);
+    var fname = 'BodyDailyLog_' + _safeName(state.techName) + '_' + _dateToFileParts(d) + '.xlsx';
+    var data  = XLSX.write(wb, { bookType: 'xlsx', type: 'array' });
+    var blob  = new Blob([data], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+    return { file: new File([blob], fname, { type: blob.type }), fname: fname };
+  });
+  var files = fileInfos.map(function(fi){ return fi.file; });
+  try {
+    if (navigator.canShare && navigator.canShare({ files: files })) {
+      await navigator.share({
+        title: 'Daily Logs — ' + state.techName,
+        text:  'Daily logs for ' + state.techName + ' — ' + dates.join(', '),
+        files: files
+      });
+      toast('Shared via system share sheet', 'ok');
+      return;
+    }
+  } catch (e) {
+    if (e && e.name === 'AbortError') return;
+    console.warn('share failed, falling back to mailto', e);
+  }
+  fileInfos.forEach(function(fi, i) {
+    setTimeout(function() {
+      var url = URL.createObjectURL(fi.file);
+      var a = document.createElement('a'); a.href = url; a.download = fi.fname;
+      document.body.appendChild(a); a.click();
+      setTimeout(function(){ URL.revokeObjectURL(url); document.body.removeChild(a); }, 300);
+    }, i * 150);
+  });
+  var to      = (state.managerEmail || '').trim();
+  var subject = encodeURIComponent('Daily Logs — ' + state.techName + ' — ' + dates.join(', '));
+  var body    = encodeURIComponent(
+    'Hi,\n\nPlease find attached daily logs for ' + state.techName + '.\nDates: ' + dates.join(', ') + '\n\n' +
+    'NOTE: ' + fileInfos.length + ' file(s) were just downloaded — please attach them before sending.\n\nThanks.'
+  );
+  setTimeout(function(){ window.location.href = 'mailto:' + to + '?subject=' + subject + '&body=' + body; }, fileInfos.length * 150 + 200);
+  toast('Files downloading — attach them to the email draft', 'ok');
+}
+// Close export dropdown when clicking outside
+document.addEventListener('click', function(e) {
+  var menu = document.getElementById('histExportMenu');
+  if (!menu || menu.style.display === 'none') return;
+  if (e.target.closest && (e.target.closest('#histExportMenu') || e.target.closest('#histExportBtn'))) return;
+  menu.style.display = 'none';
+});
+
+// ════════════════════════════════════════════════════════════════════════════
+// Export to xlsx (compatible with manager dashboard parser)
+// ════════════════════════════════════════════════════════════════════════════
+function _safeName(s){ return String(s||'unknown').replace(/[^A-Za-z0-9_\-]/g,''); }
+function _dateToFileParts(d){ var p = d.split('-'); return p[1] + '_' + p[2] + '_' + p[0]; }
+
+function buildWorkbookForDate(date) {
+  var techName = state.techName || 'unknown';
+  var shift    = state.shift || '';
+  var entries  = state.entriesByDate[date] || [];
+  // Sort by called/ini ascending
+  entries = entries.slice().sort(function(a,b){
+    var at = a.called || a.ini || '~', bt = b.called || b.ini || '~';
+    return at < bt ? -1 : at > bt ? 1 : 0;
+  });
+  // Build sheet rows. Parser expects:
+  //  - row 1-7 are header rows (parser scans rows 4-6 for "shift" substring)
+  //  - data starts at row 8 (index 7)
+  //  - columns: A=Line, B=Contact, C=Ini, D=Called, E=Run, F=Total DT, G=Follow-up, H=Classification, I=Activity, J=Countermeasure, K=Root Cause, L=Comments
+  var rows = [
+    ['Daily Log'],
+    ['MBV - Maintenance Support'],
+    ['Plant: W566 - Charleston', '', '', '', '', '', '', '', '', '', '', 'MBV Ladson, SC, USA'],
+    ['Name:', techName, '', '', '', '', '', '', '', '', '', 'Body Shop'],
+    ['Shift:', shift,    '', '', '', '', '', '', '', '', '', 'Date:'],
+    ['', '', '', '', '', '', '', '', '', '', '', date],
+    ['Line','MBV Contact','Initial Down Time','Time called by MBV','Time Running','Total Downtime','Follow-up time','Classification','Activity','Countermeasure','Root Cause','Comments']
+  ];
+  entries.forEach(function(e){
+    rows.push([
+      e.line || '',
+      e.contact || '',
+      e.ini || '',
+      e.called || '',
+      e.run || '',
+      e.totalDt || '',
+      e.followup || '',
+      e.classification || '',
+      e.activity || '',
+      e.countermeasure || '',
+      e.rootCause || '',
+      e.comments || ''
+    ]);
+  });
+  var ws = XLSX.utils.aoa_to_sheet(rows);
+  var wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, 'Daily Log');
+  return wb;
+}
+function exportSpecificDate(date) {
+  if (!state.techName) { toast('Please enter your name first', 'err'); return; }
+  var entries = state.entriesByDate[date] || [];
+  if (!entries.length) { toast('No entries on ' + date, 'err'); return; }
+  var wb = buildWorkbookForDate(date);
+  var fname = 'BodyDailyLog_' + _safeName(state.techName) + '_' + _dateToFileParts(date) + '.xlsx';
+  XLSX.writeFile(wb, fname);
+  toast('Exported ' + fname, 'ok');
+}
+function exportCurrentDate() { exportSpecificDate(state.currentDate); }
+
+// Opens the native Save-As dialog when the browser supports it; falls back to a forced download.
+async function saveXlsxWithPicker(wb, suggestedName) {
+  try {
+    if (window.showSaveFilePicker) {
+      var handle = await window.showSaveFilePicker({
+        suggestedName: suggestedName,
+        types: [{ description: 'Excel Workbook', accept: { 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet': ['.xlsx'] } }]
+      });
+      var data     = XLSX.write(wb, { bookType: 'xlsx', type: 'array' });
+      var writable = await handle.createWritable();
+      await writable.write(new Blob([data], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' }));
+      await writable.close();
+      return handle.name;
+    }
+  } catch (e) {
+    if (e && e.name === 'AbortError') return null; // user cancelled the picker
+    console.warn('showSaveFilePicker unavailable, falling back to download', e);
+  }
+  // Fallback: trigger a normal browser download
+  XLSX.writeFile(wb, suggestedName);
+  return suggestedName;
+}
+
+async function exportAllDays() {
+  if (!state.techName) { toast('Please enter your name first', 'err'); return; }
+  var dates = Object.keys(state.entriesByDate).filter(function(d){ return state.entriesByDate[d] && state.entriesByDate[d].length; });
+  if (!dates.length) { toast('No entries to export', 'err'); return; }
+  var saved = 0;
+  for (var i = 0; i < dates.length; i++) {
+    var wb    = buildWorkbookForDate(dates[i]);
+    var fname = 'BodyDailyLog_' + _safeName(state.techName) + '_' + _dateToFileParts(dates[i]) + '.xlsx';
+    var result = await saveXlsxWithPicker(wb, fname);
+    if (result) saved++;
+  }
+  if (saved) toast('Saved ' + saved + ' file' + (saved > 1 ? 's' : ''), 'ok');
+}
+function updateExportLabel() {
+  document.getElementById('exportCurDate').textContent = state.currentDate;
+}
+
+// ════════════════════════════════════════════════════════════════════════════
+// Backup / restore / reset
+// ════════════════════════════════════════════════════════════════════════════
+function backupJson() {
+  var data = JSON.stringify(state, null, 2);
+  var blob = new Blob([data], {type: 'application/json'});
+  var url  = URL.createObjectURL(blob);
+  var a    = document.createElement('a');
+  a.href   = url;
+  a.download = 'mbv_tech_backup_' + (_safeName(state.techName)||'me') + '_' + todayIso() + '.json';
+  document.body.appendChild(a); a.click();
+  setTimeout(function(){ URL.revokeObjectURL(url); document.body.removeChild(a); }, 200);
+}
+function restoreJson(evt) {
+  var f = evt.target.files && evt.target.files[0]; if (!f) return;
+  var r = new FileReader();
+  r.onload = function(){
+    try {
+      var p = JSON.parse(r.result);
+      if (!p || typeof p !== 'object') throw new Error('bad json');
+      if (!confirm('Replace ALL current data with this backup?')) return;
+      Object.assign(state, p);
+      saveState();
+      document.getElementById('techName').value = state.techName || '';
+      document.getElementById('shift').value    = state.shift || '2nd shift';
+      renderEntries(); renderActions(); renderHistory();
+      toast('Restored from backup', 'ok');
+    } catch (e) { toast('Restore failed: ' + (e.message || e), 'err'); }
+  };
+  r.readAsText(f);
+  evt.target.value = '';
+}
+function resetAll() {
+  if (!confirm('CLEAR ALL data (entries, actions, history)? This cannot be undone.')) return;
+  if (!confirm('Are you absolutely sure? Consider downloading a backup first.')) return;
+  localStorage.removeItem(STORAGE_KEY);
+  location.reload();
+}
+
+// ════════════════════════════════════════════════════════════════════════════
+// Image attachment (file picker + camera capture, compressed to data URL)
+// ════════════════════════════════════════════════════════════════════════════
+var _pendingActionImage = null;  // data URL or null — attached to next saved action
+var _pendingEntryImage  = null;  // data URL or null — attached to next saved daily-log entry
+var _cameraTarget = 'action';    // 'action' | 'entry' — where acceptPhoto routes the result
+var _cameraStream = null;
+var _capturedDataUrl = null;     // data URL currently shown in the camera preview
+
+function _formatKB(bytes){ return Math.round((bytes||0) / 1024) + ' KB'; }
+function _dataUrlBytes(dataUrl) {
+  if (!dataUrl) return 0;
+  var i = dataUrl.indexOf(',');
+  var s = i >= 0 ? dataUrl.slice(i + 1) : dataUrl;
+  return Math.floor(s.length * 3 / 4);  // base64 → bytes estimate
+}
+
+// Compress an image dataURL (resize + JPEG quality) to keep storage small
+function compressImageDataUrl(dataUrl, maxDim, quality) {
+  return new Promise(function(resolve, reject){
+    var img = new Image();
+    img.onload = function(){
+      var w = img.naturalWidth, h = img.naturalHeight;
+      var scale = Math.min(1, (maxDim||1280) / Math.max(w, h));
+      var ww = Math.max(1, Math.round(w * scale));
+      var hh = Math.max(1, Math.round(h * scale));
+      var canvas = document.createElement('canvas');
+      canvas.width = ww; canvas.height = hh;
+      var ctx = canvas.getContext('2d');
+      ctx.drawImage(img, 0, 0, ww, hh);
+      try {
+        resolve(canvas.toDataURL('image/jpeg', quality || 0.72));
+      } catch(e){ reject(e); }
+    };
+    img.onerror = reject;
+    img.src = dataUrl;
+  });
+}
+
+function showActionImagePreview(dataUrl, label) {
+  var row = document.getElementById('imgPreviewRow');
+  if (!row) return;
+  if (!dataUrl) { row.style.display = 'none'; return; }
+  row.style.display = 'flex';
+  document.getElementById('imgPreviewImg').src = dataUrl;
+  document.getElementById('imgPreviewName').textContent = label || 'Attached image';
+  document.getElementById('imgPreviewSize').textContent = 'About ' + _formatKB(_dataUrlBytes(dataUrl));
+}
+function showEntryImagePreview(dataUrl, label) {
+  var row = document.getElementById('entryImgPreviewRow');
+  if (!row) return;
+  if (!dataUrl) { row.style.display = 'none'; return; }
+  row.style.display = 'flex';
+  document.getElementById('entryImgPreviewImg').src = dataUrl;
+  document.getElementById('entryImgPreviewName').textContent = label || 'Attached image';
+  document.getElementById('entryImgPreviewSize').textContent = 'About ' + _formatKB(_dataUrlBytes(dataUrl));
+}
+function clearPendingImage() {
+  _pendingActionImage = null;
+  showActionImagePreview(null);
+  var fi = document.getElementById('imgFileInput');
+  if (fi) fi.value = '';
+}
+function clearEntryImage() {
+  _pendingEntryImage = null;
+  showEntryImagePreview(null);
+  var fi = document.getElementById('entryImgFileInput');
+  if (fi) fi.value = '';
+}
+
+async function _readImageAsCompressedDataUrl(file) {
+  if (!/^image\//i.test(file.type)) throw new Error('Pick an image file');
+  var raw = await new Promise(function(res, rej){
+    var r = new FileReader();
+    r.onload = function(){ res(r.result); };
+    r.onerror = rej;
+    r.readAsDataURL(file);
+  });
+  return await compressImageDataUrl(raw, 1280, 0.72);
+}
+
+async function onImageFileSelected(event) {
+  var file = event.target.files && event.target.files[0];
+  if (!file) return;
+  try {
+    _pendingActionImage = await _readImageAsCompressedDataUrl(file);
+    showActionImagePreview(_pendingActionImage, file.name);
+    toast('Image attached', 'ok');
+  } catch (e) {
+    toast('Could not read image: ' + (e.message || e), 'err');
+  }
+  event.target.value = '';
+}
+
+async function onEntryImageFileSelected(event) {
+  var file = event.target.files && event.target.files[0];
+  if (!file) return;
+  try {
+    _pendingEntryImage = await _readImageAsCompressedDataUrl(file);
+    showEntryImagePreview(_pendingEntryImage, file.name);
+    toast('Image attached', 'ok');
+  } catch (e) {
+    toast('Could not read image: ' + (e.message || e), 'err');
+  }
+  event.target.value = '';
+}
+
+function openCameraForAction() { _cameraTarget = 'action'; openCameraModal(); }
+function openCameraForEntry()  { _cameraTarget = 'entry';  openCameraModal(); }
+
+async function openCameraModal() {
+  if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+    toast('Camera not supported in this browser', 'err');
+    return;
+  }
+  var modal = document.getElementById('cameraModal');
+  modal.classList.add('show');
+  document.body.style.overflow = 'hidden';
+  // Reset UI to live view
+  document.getElementById('camStage').style.display = '';
+  document.getElementById('camPreviewWrap').style.display = 'none';
+  document.getElementById('captureBtns').style.display = 'flex';
+  document.getElementById('confirmBtns').style.display = 'none';
+  _capturedDataUrl = null;
+  var status = document.getElementById('camStatus');
+  status.textContent = 'Requesting camera permission…';
+  try {
+    _cameraStream = await navigator.mediaDevices.getUserMedia({
+      video: { facingMode: { ideal: 'environment' } },
+      audio: false
+    });
+    var video = document.getElementById('camVideo');
+    video.srcObject = _cameraStream;
+    status.textContent = 'Live preview — frame your subject and tap 📸 Capture';
+  } catch (e) {
+    var msg = e && e.name === 'NotAllowedError' ? 'Camera permission was denied. You can re-enable in browser settings.'
+            : e && e.name === 'NotFoundError'   ? 'No camera detected on this device.'
+            : 'Camera error: ' + (e.message || e);
+    status.textContent = '⚠ ' + msg;
+    toast(msg, 'err');
+  }
+}
+function closeCameraModal() {
+  if (_cameraStream) {
+    _cameraStream.getTracks().forEach(function(t){ try { t.stop(); } catch(e){} });
+    _cameraStream = null;
+  }
+  var v = document.getElementById('camVideo'); if (v) v.srcObject = null;
+  document.getElementById('cameraModal').classList.remove('show');
+  document.body.style.overflow = '';
+  _capturedDataUrl = null;
+}
+async function capturePhoto() {
+  var video = document.getElementById('camVideo');
+  var canvas = document.getElementById('camCanvas');
+  if (!video || !video.videoWidth) { toast('Camera not ready yet', 'err'); return; }
+  canvas.width  = video.videoWidth;
+  canvas.height = video.videoHeight;
+  var ctx = canvas.getContext('2d');
+  ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+  var raw = canvas.toDataURL('image/jpeg', 0.9);
+  try { _capturedDataUrl = await compressImageDataUrl(raw, 1280, 0.72); }
+  catch (e) { _capturedDataUrl = raw; }
+  // Switch to preview
+  document.getElementById('camStage').style.display = 'none';
+  document.getElementById('camPreviewWrap').style.display = '';
+  document.getElementById('camPreviewImg').src = _capturedDataUrl;
+  document.getElementById('captureBtns').style.display = 'none';
+  document.getElementById('confirmBtns').style.display = 'flex';
+  document.getElementById('camStatus').textContent = '~' + _formatKB(_dataUrlBytes(_capturedDataUrl)) + ' — accept or retake';
+}
+function retakePhoto() {
+  _capturedDataUrl = null;
+  document.getElementById('camStage').style.display = '';
+  document.getElementById('camPreviewWrap').style.display = 'none';
+  document.getElementById('captureBtns').style.display = 'flex';
+  document.getElementById('confirmBtns').style.display = 'none';
+  document.getElementById('camStatus').textContent = 'Live preview — frame your subject and tap 📸 Capture';
+}
+function acceptPhoto() {
+  if (!_capturedDataUrl) return;
+  var label = 'Camera capture · ' + new Date().toLocaleTimeString();
+  if (_cameraTarget === 'entry') {
+    _pendingEntryImage = _capturedDataUrl;
+    showEntryImagePreview(_pendingEntryImage, label);
+  } else {
+    _pendingActionImage = _capturedDataUrl;
+    showActionImagePreview(_pendingActionImage, label);
+  }
+  closeCameraModal();
+  toast('Photo attached', 'ok');
+}
+
+function openImageViewer(dataUrl, title) {
+  if (!dataUrl) return;
+  document.getElementById('viewerImg').src = dataUrl;
+  document.getElementById('imageViewerTitle').textContent = title || 'Image';
+  document.getElementById('imageViewerModal').classList.add('show');
+  document.body.style.overflow = 'hidden';
+}
+function closeImageViewer() {
+  document.getElementById('imageViewerModal').classList.remove('show');
+  document.body.style.overflow = '';
+  document.getElementById('viewerImg').src = '';
+}
+// Make available for inline onclick from dynamically-rendered rows
+window.openImageViewer = openImageViewer;
+
+// Keep references so action / entry objects with images can render thumbnails
+window._actionImages = {};   // id -> dataUrl for quick lookup at render time
+window._entryImages  = {};   // id -> dataUrl for daily-log entries
+
+// ════════════════════════════════════════════════════════════════════════════
+// Team folder (FS Access API) + IndexedDB for directory handle persistence
+// ════════════════════════════════════════════════════════════════════════════
+var DIR_DB = 'mbvTechDirHandle_v1';
+var DIR_STORE = 'handles';
+var SHARED_ACTIONS_FILE = '_team_actions.json';
+var teamDirHandle = null; // in-memory cache once permission is granted
+
+function _openDirDB() {
+  return new Promise(function(resolve, reject){
+    var req = indexedDB.open(DIR_DB, 1);
+    req.onupgradeneeded = function(e){
+      var db = e.target.result;
+      if (!db.objectStoreNames.contains(DIR_STORE)) db.createObjectStore(DIR_STORE);
+    };
+    req.onsuccess = function(){ resolve(req.result); };
+    req.onerror = function(){ reject(req.error); };
+  });
+}
+async function _idbSet(key, val) {
+  var db = await _openDirDB();
+  return new Promise(function(resolve, reject){
+    var tx = db.transaction(DIR_STORE, 'readwrite');
+    var req = tx.objectStore(DIR_STORE).put(val, key);
+    req.onsuccess = function(){ resolve(true); };
+    req.onerror = function(){ reject(req.error); };
+  });
+}
+async function _idbGet(key) {
+  var db = await _openDirDB();
+  return new Promise(function(resolve, reject){
+    var tx = db.transaction(DIR_STORE, 'readonly');
+    var req = tx.objectStore(DIR_STORE).get(key);
+    req.onsuccess = function(){ resolve(req.result || null); };
+    req.onerror = function(){ reject(req.error); };
+  });
+}
+async function _idbDel(key) {
+  var db = await _openDirDB();
+  return new Promise(function(resolve, reject){
+    var tx = db.transaction(DIR_STORE, 'readwrite');
+    var req = tx.objectStore(DIR_STORE).delete(key);
+    req.onsuccess = function(){ resolve(true); };
+    req.onerror = function(){ reject(req.error); };
+  });
+}
+
+async function _verifyPerm(handle, write) {
+  if (!handle || typeof handle.queryPermission !== 'function') return false;
+  var opts = { mode: write ? 'readwrite' : 'read' };
+  var p = await handle.queryPermission(opts);
+  if (p === 'granted') return true;
+  p = await handle.requestPermission(opts);
+  return p === 'granted';
+}
+
+async function ensureTeamFolderRead()      { return await _ensureTeamFolder(false); }
+async function ensureTeamFolderReadWrite() { return await _ensureTeamFolder(true);  }
+
+async function _ensureTeamFolder(needWrite) {
+  if (!teamDirHandle) {
+    try { teamDirHandle = await _idbGet('teamDir'); } catch(e) { return false; }
+  }
+  if (!teamDirHandle) return false;
+  return await _verifyPerm(teamDirHandle, needWrite);
+}
+
+async function pickTeamFolder() {
+  if (typeof window.showDirectoryPicker !== 'function') {
+    toast('Folder picker not supported in this browser. Use Microsoft Edge or Google Chrome.', 'err');
+    return;
+  }
+  try {
+    var h = await window.showDirectoryPicker({ mode: 'readwrite' });
+    teamDirHandle = h;
+    await _idbSet('teamDir', h);
+    state.folderName = h.name;
+    saveState();
+    renderFolderCard();
+    toast('Team folder linked: ' + h.name, 'ok');
+  } catch (e) {
+    if (e && e.name === 'AbortError') return;
+    toast('Could not open folder: ' + (e.message || e), 'err');
+  }
+}
+async function unlinkTeamFolder() {
+  if (!confirm('Unlink the team folder? Local data stays — only the link is removed.')) return;
+  teamDirHandle = null;
+  await _idbDel('teamDir');
+  state.folderName = '';
+  saveState();
+  renderFolderCard();
+  toast('Team folder unlinked', 'ok');
+}
+function renderFolderCard() {
+  var nameEl = document.getElementById('folderName');
+  var unlink = document.getElementById('unlinkBtn');
+  if (!nameEl) return;
+  if (state.folderName) {
+    nameEl.className = 'fname';
+    nameEl.textContent = '📂 ' + state.folderName;
+    if (unlink) unlink.style.display = 'inline-block';
+  } else {
+    nameEl.className = 'none';
+    nameEl.textContent = 'No folder linked yet';
+    if (unlink) unlink.style.display = 'none';
+  }
+}
+
+async function readSharedActions() {
+  if (!await ensureTeamFolderRead()) return null;
+  try {
+    var fh = await teamDirHandle.getFileHandle(SHARED_ACTIONS_FILE, { create: false });
+    var f = await fh.getFile();
+    var text = await f.text();
+    var parsed = JSON.parse(text);
+    return Array.isArray(parsed) ? parsed : (parsed.actions || []);
+  } catch (e) {
+    if (e && e.name === 'NotFoundError') return [];   // file doesn't exist yet — empty list
+    console.warn('readSharedActions', e);
+    return null;
+  }
+}
+async function writeSharedActions(actions) {
+  if (!await ensureTeamFolderReadWrite()) throw new Error('No team folder write permission');
+  var fh = await teamDirHandle.getFileHandle(SHARED_ACTIONS_FILE, { create: true });
+  var w = await fh.createWritable();
+  await w.write(JSON.stringify(actions || [], null, 2));
+  await w.close();
+}
+
+async function updateFromFolder() {
+  var us = document.getElementById('updateStatus');
+  try {
+    if (!await ensureTeamFolderRead()) {
+      if (us) { us.className = 'sync-status err'; us.textContent = '⚠ Folder access denied'; }
+      toast('Pick a team folder first', 'err');
+      return;
+    }
+    // Pull shared actions
+    var remote = await readSharedActions();
+    if (remote) {
+      state.actions = remote;
+      saveState();
+      renderActions();
+    }
+    // List the recent xlsx reports in the folder for visibility
+    var reports = [];
+    for await (var entry of teamDirHandle.values()) {
+      if (entry.kind !== 'file') continue;
+      var nm = entry.name;
+      if (nm.indexOf('~$') === 0) continue;
+      if (!/^BodyDailyLog_.*\.xlsx$/i.test(nm)) continue;
+      var f = await entry.getFile();
+      reports.push({ name: nm, modified: f.lastModified, size: f.size });
+    }
+    reports.sort(function(a,b){ return b.modified - a.modified; });
+    var rrEl = document.getElementById('recentReports');
+    if (rrEl) {
+      if (!reports.length) {
+        rrEl.innerHTML = '<div class="empty">No daily reports yet in this folder.</div>';
+      } else {
+        rrEl.innerHTML = '<div style="font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;font-weight:600;margin-bottom:8px">Recent team reports (' + reports.length + ')</div>'
+          + reports.slice(0, 15).map(function(r){
+              var d = new Date(r.modified);
+              return '<div class="entry-card" style="display:flex;justify-content:space-between;align-items:center;font-size:12px">'
+                + '<span style="font-family:monospace;color:#cbd5e1">' + esc(r.name) + '</span>'
+                + '<span style="color:var(--muted)">' + d.toLocaleString() + ' · ' + Math.round(r.size/1024) + ' KB</span>'
+              + '</div>';
+            }).join('');
+      }
+    }
+    if (us) {
+      us.className = 'sync-status ok';
+      us.textContent = '✓ Updated at ' + new Date().toLocaleTimeString() + ' · ' + reports.length + ' reports · ' + (state.actions || []).length + ' actions';
+    }
+    setSyncStatus('ok', '✓ Pulled at ' + new Date().toLocaleTimeString());
+    toast('Updated from team folder', 'ok');
+  } catch (e) {
+    console.error(e);
+    if (us) { us.className = 'sync-status err'; us.textContent = '⚠ Update failed'; }
+    toast('Update failed: ' + (e.message || e), 'err');
+  }
+}
+
+// ════════════════════════════════════════════════════════════════════════════
+// Save exports to the team folder (if linked) instead of downloading
+// ════════════════════════════════════════════════════════════════════════════
+async function writeWorkbookToFolder(wb, fileName) {
+  if (!await ensureTeamFolderReadWrite()) return false;
+  // SheetJS writes to xlsx as Uint8Array via type 'array' / bookType 'xlsx'
+  var data = XLSX.write(wb, { bookType: 'xlsx', type: 'array' });
+  var fh = await teamDirHandle.getFileHandle(fileName, { create: true });
+  var w = await fh.createWritable();
+  await w.write(new Blob([data], {type:'application/octet-stream'}));
+  await w.close();
+  return true;
+}
+
+// Replace exportSpecificDate with a version that prefers the team folder
+window.exportSpecificDate = async function(date) {
+  if (!state.techName) { toast('Please enter your name first', 'err'); return null; }
+  var entries = state.entriesByDate[date] || [];
+  if (!entries.length) { toast('No entries on ' + date, 'err'); return null; }
+  var wb = buildWorkbookForDate(date);
+  var fname = 'BodyDailyLog_' + _safeName(state.techName) + '_' + _dateToFileParts(date) + '.xlsx';
+  var savedToFolder = false;
+  try { savedToFolder = await writeWorkbookToFolder(wb, fname); }
+  catch (e) { console.warn('write to folder failed', e); }
+  if (!savedToFolder) {
+    var picked = await saveXlsxWithPicker(wb, fname);
+    if (!picked) return null; // user cancelled the Save-As dialog
+    setLastExportInfo('Saved: ' + picked);
+    toast('Saved ' + picked, 'ok');
+  } else {
+    setLastExportInfo('Saved to team folder: ' + fname);
+    toast('Saved to team folder: ' + fname, 'ok');
+  }
+  return fname;
+};
+function setLastExportInfo(text) {
+  var el = document.getElementById('lastExportInfo');
+  if (el) el.textContent = text;
+}
+
+// ════════════════════════════════════════════════════════════════════════════
+// Email the current day's report (Web Share API with files, mailto fallback)
+// ════════════════════════════════════════════════════════════════════════════
+async function sendCurrentDateByEmail() {
+  if (!state.techName) { toast('Please enter your name first', 'err'); return; }
+  var date = state.currentDate;
+  var entries = state.entriesByDate[date] || [];
+  if (!entries.length) { toast('No entries to send for ' + date, 'err'); return; }
+
+  var wb = buildWorkbookForDate(date);
+  var fname = 'BodyDailyLog_' + _safeName(state.techName) + '_' + _dateToFileParts(date) + '.xlsx';
+
+  // Try Web Share API with file (works on modern Edge/Chrome if HTTPS — and on file:// for some builds)
+  try {
+    var data = XLSX.write(wb, { bookType: 'xlsx', type: 'array' });
+    var blob = new Blob([data], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+    var file = new File([blob], fname, { type: blob.type });
+    if (navigator.canShare && navigator.canShare({ files: [file] })) {
+      await navigator.share({
+        title: 'Daily Log — ' + state.techName + ' — ' + date,
+        text: 'Daily log for ' + state.techName + ' on ' + date + '.',
+        files: [file]
+      });
+      toast('Shared via system share sheet', 'ok');
+      return;
+    }
+  } catch (e) {
+    // user cancelled or share failed → fall through to mailto
+    if (e && e.name === 'AbortError') return;
+    console.warn('share failed, falling back to mailto', e);
+  }
+
+  // Fallback: download the file + open mailto for the supervisor
+  XLSX.writeFile(wb, fname);
+  var to = (state.managerEmail || '').trim();
+  var subject = encodeURIComponent('Daily Log — ' + state.techName + ' — ' + date);
+  var body = encodeURIComponent(
+    'Hi,\n\n' +
+    'Daily log for ' + state.techName + ' on ' + date + ' attached.\n\n' +
+    'NOTE: The file ' + fname + ' was just downloaded to your Downloads folder — please attach it to this email before sending.\n\n' +
+    'Thanks.'
+  );
+  var url = 'mailto:' + to + '?subject=' + subject + '&body=' + body;
+  window.location.href = url;
+  toast('Email draft opened — please attach ' + fname + ' from Downloads', 'ok');
+}
+
+// ════════════════════════════════════════════════════════════════════════════
+// Login
+// ════════════════════════════════════════════════════════════════════════════
+function submitLogin() {
+  var nameVal  = document.getElementById('loginName').value.trim();
+  var shiftVal = document.getElementById('loginShift').value;
+  var titleVal = document.getElementById('loginTitle').value.trim();
+  var emailVal = document.getElementById('loginEmail').value.trim().toLowerCase();
+  var errEl    = document.getElementById('loginError');
+
+  // Clear previous highlights
+  ['loginName','loginShift','loginTitle','loginEmail'].forEach(function(id){
+    document.getElementById(id).classList.remove('invalid');
+  });
+  errEl.style.display = 'none';
+
+  var missing = [];
+  if (!nameVal)  { missing.push('User Name'); document.getElementById('loginName').classList.add('invalid'); }
+  if (!shiftVal) { missing.push('Shift');     document.getElementById('loginShift').classList.add('invalid'); }
+  if (!titleVal) { missing.push('Title');     document.getElementById('loginTitle').classList.add('invalid'); }
+  if (!emailVal) { missing.push('Email');     document.getElementById('loginEmail').classList.add('invalid'); }
+
+  if (missing.length) {
+    errEl.textContent = 'Please fill in: ' + missing.join(', ') + '.';
+    errEl.style.display = 'block';
+    return;
+  }
+  if (!emailVal.endsWith('@mercedes-benz.com')) {
+    document.getElementById('loginEmail').classList.add('invalid');
+    errEl.textContent = '⛔ User not authorized. Email must end with @mercedes-benz.com.';
+    errEl.style.display = 'block';
+    return;
+  }
+
+  // Persist session (clears when browser tab is closed)
+  sessionStorage.setItem('mbvLogin', JSON.stringify({ name: nameVal, shift: shiftVal, title: titleVal, email: emailVal }));
+
+  // Push into app state
+  state.techName = nameVal;
+  state.shift    = shiftVal;
+  document.getElementById('techName').value = nameVal;
+  document.getElementById('shift').value    = shiftVal;
+  saveState();
+
+  document.getElementById('loginOverlay').style.display = 'none';
+}
+
+// ════════════════════════════════════════════════════════════════════════════
+// Init
+// ════════════════════════════════════════════════════════════════════════════
+window.addEventListener('DOMContentLoaded', async function(){
+  loadState();
+
+  // Restore login session if still open in same browser tab
+  try {
+    var _ls = sessionStorage.getItem('mbvLogin');
+    if (_ls) {
+      var _ld = JSON.parse(_ls);
+      state.techName = _ld.name  || state.techName;
+      state.shift    = _ld.shift || state.shift;
+      document.getElementById('loginOverlay').style.display = 'none';
+    }
+  } catch(e) { sessionStorage.removeItem('mbvLogin'); }
+
+  document.getElementById('techName').value     = state.techName || '';
+  document.getElementById('shift').value        = state.shift || '2nd shift';
+  document.getElementById('currentDate').value  = state.currentDate || todayIso();
+  var meEl = document.getElementById('managerEmail');
+  if (meEl) meEl.value = state.managerEmail || '';
+  renderEntries();
+  renderActions();
+  renderFolderCard();
+  switchTab(state.currentTab || 'log');
+  // Esc closes whichever modal is open
+  document.addEventListener('keydown', function(e){
+    if (e.key !== 'Escape') return;
+    if (document.getElementById('cameraModal').classList.contains('show'))      { closeCameraModal();  return; }
+    if (document.getElementById('imageViewerModal').classList.contains('show')) { closeImageViewer();  return; }
+    if (document.getElementById('entryModal').classList.contains('show'))       { closeEntryModal();   return; }
+  });
+  // Auto-restore team folder handle from IndexedDB so we don't need to ask again
+  try {
+    var h = await _idbGet('teamDir');
+    if (h) {
+      teamDirHandle = h;
+      // try a silent pull (queryPermission only — no prompt)
+      var p = await h.queryPermission({ mode: 'read' });
+      if (p === 'granted') {
+        var remote = await readSharedActions();
+        if (Array.isArray(remote)) {
+          state.actions = remote;
+          saveState();
+          renderActions();
+          setSyncStatus('ok', '✓ Loaded from team folder on startup');
+        }
+      } else {
+        setSyncStatus('warn', '⚠ Click 🔄 Pull latest to refresh (needs permission)');
+      }
+    }
+  } catch (e) { console.warn('startup folder restore', e); }
+});
+</script>
+</body>
+</html>
